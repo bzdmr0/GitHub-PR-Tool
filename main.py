@@ -4,13 +4,15 @@ import subprocess
 
 # Initialize GitHub client with your personal access token from environment variable
 # Set your token with: export GITHUB_TOKEN="your_token_here"
-token = os.getenv('GITHUB_TOKEN')
+token = os.getenv('GITHUB_TOKEN') or "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"
 if not token:
     print("Error: Please set your GitHub token as an environment variable:")
     print("export GITHUB_TOKEN='your_token_here'")
     exit(1)
 
 g = Github(token)
+
+####afasdfasdf
 
 def get_current_git_branch():
     """Get the current Git branch name"""
@@ -24,7 +26,7 @@ def get_current_git_branch():
 def create_pull_request():
     try:
         # Get repository details from user
-        repo_name = input("Enter repository name (owner/repo-name): ").strip()
+        repo_name = "bzdmr0/GitHub-PR-Tool"
         
         # Get the repository
         repo = g.get_repo(repo_name)
@@ -39,15 +41,8 @@ def create_pull_request():
             body = "Description of changes"
             
         # Get current Git branch automatically
-        current_branch = get_current_git_branch()
-        if current_branch:
-            print(f"Current Git branch detected: {current_branch}")
-            use_current = input(f"Use '{current_branch}' as source branch? (y/n, default=y): ").strip().lower()
-            if use_current in ['', 'y', 'yes']:
-                head_branch = current_branch
-            else:
-                head_branch = input("Enter source branch (branch to merge FROM): ").strip()
-        else:
+        head_branch = get_current_git_branch()
+        if not head_branch:
             print("Could not detect current Git branch")
             head_branch = input("Enter source branch (branch to merge FROM): ").strip()
             
