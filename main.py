@@ -1,6 +1,13 @@
 from github import Github
 import os
 import subprocess
+import base64
+from datetime import datetime
+try:
+    import git
+    GITPYTHON_AVAILABLE = True
+except ImportError:
+    GITPYTHON_AVAILABLE = False
 
 # Initialize GitHub client with your personal access token from environment variable
 # Set your token with: export GITHUB_TOKEN="your_token_here"
@@ -12,8 +19,6 @@ if not token:
 
 g = Github(token)
 
-####afasdfasdf
-
 def get_current_git_branch():
     """Get the current Git branch name"""
     try:
@@ -22,6 +27,228 @@ def get_current_git_branch():
         return result.stdout.strip()
     except subprocess.CalledProcessError:
         return None
+
+def create_commit_via_api_auto():
+    """Create a commit via GitHub API with automatic file detection"""
+    try:
+        repo = g.get_repo("bzdmr0/GitHub-PR-Tool")
+        
+        # Get all modified files
+        result = subprocess.run(['git', 'status', '--porcelain'], 
+                              capture_output=True, text=True, check=True)
+        
+        if not result.stdout.strip():
+            print("No changes to commit")
+            return False
+        
+        print("Modified files:")
+        modified_files = []
+        for line in result.stdout.strip().split('\n'):
+            if line.strip():
+                # Extract filename from git status output
+                file_path = line[3:].strip()  # Remove status indicators
+                modified_files.append(file_path)
+                print(f"  - {file_path}")
+        
+        if not modified_files:
+            print("No files to commit")
+            return False
+        
+        commit_message = input("Enter commit message: ").strip()
+        if not commit_message:
+            commit_message = f"Auto commit - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        
+        branch = input("Enter branch (default: current): ").strip()
+        if not branch:
+            branch = get_current_git_branch() or "main"
+        
+        success_count = 0
+        
+        for file_path in modified_files:
+            try:
+                # Read the local file content
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                
+                # Check if file already exists in repo
+                try:
+                    file = repo.get_contents(file_path, ref=branch)
+                    # File exists, update it
+                    repo.update_file(
+                        path=file_path,
+                        message=f"{commit_message} - Update {file_path}",
+                        content=content,
+                        sha=file.sha,
+                        branch=branch
+                    )
+                    print(f"✅ File '{file_path}' updated")
+                except:
+                    # File doesn't exist, create it
+                    repo.create_file(
+                        path=file_path,
+                        message=f"{commit_message} - Create {file_path}",
+                        content=content,
+                        branch=branch
+                    )
+                    print(f"✅ File '{file_path}' created")
+                
+                success_count += 1
+                
+            except Exception as e:
+                print(f"❌ Error with file '{file_path}': {e}")
+        
+        print(f"\nCommit completed! {success_count}/{len(modified_files)} files processed successfully.")
+        return success_count > 0
+        
+    except Exception as e:
+        print(f"Error creating auto commit via API: {e}")
+        return False
+
+def create_commit_via_api(file_path, content, commit_message, branch="main"):
+    """Create a commit directly via GitHub API"""
+    try:
+        repo = g.get_repo("bzdmr0/GitHub-PR-Tool")
+        
+        # Check if file already exists
+        try:
+            file = repo.get_contents(file_path, ref=branch)
+            # File exists, update it
+            repo.update_file(
+                path=file_path,
+                message=commit_message,
+                content=content,
+                sha=file.sha,
+                branch=branch
+            )
+            print(f"File '{file_path}' updated with commit: {commit_message}")
+        except:
+            # File doesn't exist, create it
+            repo.create_file(
+                path=file_path,
+                message=commit_message,
+                content=content,
+                branch=branch
+            )
+            print(f"File '{file_path}' created with commit: {commit_message}")
+        
+        return True
+    except Exception as e:
+        print(f"Error creating commit via API: {e}")
+        return False
+
+def create_commit_via_subprocess(file_path, commit_message):
+    """Create a commit using git commands via subprocess"""
+    try:
+        # Add the file to staging
+        subprocess.run(['git', 'add', file_path], check=True)
+        
+        # Create the commit
+        subprocess.run(['git', 'commit', '-m', commit_message], check=True)
+        
+        print(f"Commit created successfully: {commit_message}")
+        return True
+    except subprocess.CalledProcessError as e:
+        print(f"Error creating commit: {e}")
+        return False
+
+def create_commit_with_gitpython(file_paths, commit_message):
+    """Create a commit using GitPython library"""
+    if not GITPYTHON_AVAILABLE:
+        print("GitPython not available. Install it with: pip install GitPython")
+        return False
+    
+    try:
+        # Initialize repo object
+        repo = git.Repo('.')
+        
+        # Add files to index
+        if isinstance(file_paths, str):
+            file_paths = [file_paths]
+        
+        for file_path in file_paths:
+            repo.index.add([file_path])
+        
+        # Create commit
+        commit = repo.index.commit(commit_message)
+        
+        print(f"Commit created successfully!")
+        print(f"Commit hash: {commit.hexsha[:8]}")
+        print(f"Message: {commit_message}")
+        print(f"Author: {commit.author}")
+        print(f"Date: {commit.committed_datetime}")
+        
+        return True
+    except Exception as e:
+        print(f"Error creating commit with GitPython: {e}")
+        return False
+
+def create_file_and_commit(file_path, content, commit_message):
+    """Create a new file and commit it in one operation"""
+    try:
+        # Create the file
+        with open(file_path, 'w') as f:
+            f.write(content)
+        
+        print(f"File '{file_path}' created successfully")
+        
+        # Commit the file
+        success = create_commit_via_subprocess(file_path, commit_message)
+        return success
+    except Exception as e:
+        print(f"Error creating file and commit: {e}")
+        return False
+
+def bulk_commit_changes():
+    """Create a commit with multiple file changes"""
+    try:
+        # Get all modified files
+        result = subprocess.run(['git', 'status', '--porcelain'], 
+                              capture_output=True, text=True, check=True)
+        
+        if not result.stdout.strip():
+            print("No changes to commit")
+            return False
+        
+        print("Modified files:")
+        print(result.stdout)
+        
+        commit_message = input("Enter commit message: ").strip()
+        if not commit_message:
+            commit_message = f"Auto commit - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        
+        # Add all changes
+        subprocess.run(['git', 'add', '.'], check=True)
+        
+        # Create commit
+        subprocess.run(['git', 'commit', '-m', commit_message], check=True)
+        
+        print(f"Bulk commit created: {commit_message}")
+        return True
+    except subprocess.CalledProcessError as e:
+        print(f"Error creating bulk commit: {e}")
+        return False
+
+def show_commit_history(limit=5):
+    """Show recent commit history using GitPython"""
+    if not GITPYTHON_AVAILABLE:
+        print("GitPython not available. Install it with: pip install GitPython")
+        return
+    
+    try:
+        repo = git.Repo('.')
+        commits = list(repo.iter_commits(max_count=limit))
+        
+        print(f"\nRecent {len(commits)} commits:")
+        print("-" * 60)
+        
+        for commit in commits:
+            print(f"Hash: {commit.hexsha[:8]}")
+            print(f"Author: {commit.author}")
+            print(f"Date: {commit.committed_datetime.strftime('%Y-%m-%d %H:%M:%S')}")
+            print(f"Message: {commit.message.strip()}")
+            print("-" * 60)
+    except Exception as e:
+        print(f"Error showing commit history: {e}")
 
 def create_pull_request():
     try:
@@ -70,6 +297,56 @@ def create_pull_request():
         return None
 
 if __name__ == "__main__":
-    print("GitHub Pull Request Manager")
+    print("GitHub PR & Commit Manager")
     print("=" * 40)
-    create_pull_request()
+    
+    while True:
+        print("\nOptions:")
+        print("1. Create Pull Request")
+        print("2. Create Commit (local git)")
+        print("3. Create Commit (via GitHub API) - Manual")
+        print("4. Create Commit (via GitHub API) - Auto detect files")
+        print("5. Bulk commit all changes")
+        print("6. Create commit with GitPython")
+        print("7. Show commit history")
+        print("8. Create file and commit")
+        print("9. Exit")
+        
+        choice = input("\nEnter your choice (1-9): ").strip()
+        
+        if choice == "1":
+            create_pull_request()
+        elif choice == "2":
+            file_path = input("Enter file path to commit: ").strip()
+            commit_message = input("Enter commit message: ").strip()
+            create_commit_via_subprocess(file_path, commit_message)
+        elif choice == "3":
+            repo_name = input("Enter repository name (owner/repo): ").strip() or "bzdmr0/GitHub-PR-Tool"
+            file_path = input("Enter file path: ").strip()
+            content = input("Enter file content: ").strip()
+            commit_message = input("Enter commit message: ").strip()
+            branch = input("Enter branch (default: main): ").strip() or "main"
+            create_commit_via_api(file_path, content, commit_message, branch)
+        elif choice == "4":
+            create_commit_via_api_auto()
+        elif choice == "5":
+            bulk_commit_changes()
+        elif choice == "6":
+            file_paths = input("Enter file path(s) separated by comma: ").strip().split(',')
+            file_paths = [fp.strip() for fp in file_paths if fp.strip()]
+            commit_message = input("Enter commit message: ").strip()
+            create_commit_with_gitpython(file_paths, commit_message)
+        elif choice == "7":
+            limit = input("Number of commits to show (default: 5): ").strip()
+            limit = int(limit) if limit.isdigit() else 5
+            show_commit_history(limit)
+        elif choice == "8":
+            file_path = input("Enter new file path: ").strip()
+            content = input("Enter file content: ").strip()
+            commit_message = input("Enter commit message: ").strip()
+            create_file_and_commit(file_path, content, commit_message)
+        elif choice == "9":
+            print("Goodbye!")
+            break
+        else:
+            print("Invalid choice, please try again.")
