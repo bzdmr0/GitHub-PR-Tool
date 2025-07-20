@@ -1,0 +1,1 @@
+/usr/bin/cc CMakeFiles/test_app.dir/test.c.o -o test_app  /usr/local/lib/libglfw3.a -lGLESv2 -lEGL -lm /usr/lib/x86_64-linux-gnu/librt.a -lm -ldl 
