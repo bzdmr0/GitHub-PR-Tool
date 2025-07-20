@@ -58,9 +58,15 @@ def create_commit_via_api_auto():
         if not commit_message:
             commit_message = f"Auto commit - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
         
-        branch = input("Enter branch (default: current): ").strip()
-        if not branch:
-            branch = get_current_git_branch() or "main"
+        branch = get_current_git_branch()
+        
+        # Check if branch exists on remote
+        try:
+            repo.get_branch(branch)
+            print(f"Using branch: {branch}")
+        except:
+            print(f"Branch '{branch}' not found on remote, using 'main' instead")
+            branch = "main"
         
         success_count = 0
         
@@ -76,21 +82,26 @@ def create_commit_via_api_auto():
                     # File exists, update it
                     repo.update_file(
                         path=file_path,
-                        message=f"{commit_message} - Update {file_path}",
+                        message=f"{commit_message}",
                         content=content,
                         sha=file.sha,
                         branch=branch
                     )
                     print(f"✅ File '{file_path}' updated")
-                except:
+                except Exception as get_error:
+                    print(f"File doesn't exist on remote or error getting SHA: {get_error}")
                     # File doesn't exist, create it
-                    repo.create_file(
-                        path=file_path,
-                        message=f"{commit_message} - Create {file_path}",
-                        content=content,
-                        branch=branch
-                    )
-                    print(f"✅ File '{file_path}' created")
+                    try:
+                        repo.create_file(
+                            path=file_path,
+                            message=f"{commit_message}",
+                            content=content,
+                            branch=branch
+                        )
+                        print(f"✅ File '{file_path}' created")
+                    except Exception as create_error:
+                        print(f"❌ Error creating file '{file_path}': {create_error}")
+                        continue
                 
                 success_count += 1
                 
@@ -136,7 +147,7 @@ def create_commit_via_api(file_path, content, commit_message, branch="main"):
         print(f"Error creating commit via API: {e}")
         return False
 
-def create_commit_via_subprocess(file_path, commit_message):
+def create_commit_via_subprocess(file_path, commit_message, auto_push=True):
     """Create a commit using git commands via subprocess"""
     try:
         # Add the file to staging
@@ -146,12 +157,24 @@ def create_commit_via_subprocess(file_path, commit_message):
         subprocess.run(['git', 'commit', '-m', commit_message], check=True)
         
         print(f"Commit created successfully: {commit_message}")
+        
+        # Auto-push to GitHub if enabled
+        if auto_push:
+            try:
+                current_branch = get_current_git_branch()
+                print(f"Pushing to GitHub on branch '{current_branch}'...")
+                subprocess.run(['git', 'push', 'origin', current_branch], check=True)
+                print("✅ Successfully pushed to GitHub!")
+            except subprocess.CalledProcessError as push_error:
+                print(f"⚠️ Commit created locally but failed to push: {push_error}")
+                print("Run 'git push' manually to sync with GitHub")
+        
         return True
     except subprocess.CalledProcessError as e:
         print(f"Error creating commit: {e}")
         return False
 
-def create_commit_with_gitpython(file_paths, commit_message):
+def create_commit_with_gitpython(file_paths, commit_message, auto_push=True):
     """Create a commit using GitPython library"""
     if not GITPYTHON_AVAILABLE:
         print("GitPython not available. Install it with: pip install GitPython")
@@ -177,12 +200,24 @@ def create_commit_with_gitpython(file_paths, commit_message):
         print(f"Author: {commit.author}")
         print(f"Date: {commit.committed_datetime}")
         
+        # Auto-push to GitHub if enabled
+        if auto_push:
+            try:
+                current_branch = get_current_git_branch()
+                print(f"Pushing to GitHub on branch '{current_branch}'...")
+                origin = repo.remote('origin')
+                origin.push(current_branch)
+                print("✅ Successfully pushed to GitHub!")
+            except Exception as push_error:
+                print(f"⚠️ Commit created locally but failed to push: {push_error}")
+                print("Run 'git push' manually to sync with GitHub")
+        
         return True
     except Exception as e:
         print(f"Error creating commit with GitPython: {e}")
         return False
 
-def create_file_and_commit(file_path, content, commit_message):
+def create_file_and_commit(file_path, content, commit_message, auto_push=True):
     """Create a new file and commit it in one operation"""
     try:
         # Create the file
@@ -191,14 +226,14 @@ def create_file_and_commit(file_path, content, commit_message):
         
         print(f"File '{file_path}' created successfully")
         
-        # Commit the file
-        success = create_commit_via_subprocess(file_path, commit_message)
+        # Commit the file with auto-push
+        success = create_commit_via_subprocess(file_path, commit_message, auto_push)
         return success
     except Exception as e:
         print(f"Error creating file and commit: {e}")
         return False
 
-def bulk_commit_changes():
+def bulk_commit_changes(auto_push=True):
     """Create a commit with multiple file changes"""
     try:
         # Get all modified files
@@ -223,6 +258,18 @@ def bulk_commit_changes():
         subprocess.run(['git', 'commit', '-m', commit_message], check=True)
         
         print(f"Bulk commit created: {commit_message}")
+        
+        # Auto-push to GitHub if enabled
+        if auto_push:
+            try:
+                current_branch = get_current_git_branch()
+                print(f"Pushing to GitHub on branch '{current_branch}'...")
+                subprocess.run(['git', 'push', 'origin', current_branch], check=True)
+                print("✅ Successfully pushed to GitHub!")
+            except subprocess.CalledProcessError as push_error:
+                print(f"⚠️ Commit created locally but failed to push: {push_error}")
+                print("Run 'git push' manually to sync with GitHub")
+        
         return True
     except subprocess.CalledProcessError as e:
         print(f"Error creating bulk commit: {e}")
@@ -319,7 +366,9 @@ if __name__ == "__main__":
         elif choice == "2":
             file_path = input("Enter file path to commit: ").strip()
             commit_message = input("Enter commit message: ").strip()
-            create_commit_via_subprocess(file_path, commit_message)
+            push_choice = input("Auto-push to GitHub? (y/n, default: y): ").strip().lower()
+            auto_push = push_choice != 'n'
+            create_commit_via_subprocess(file_path, commit_message, auto_push)
         elif choice == "3":
             repo_name = input("Enter repository name (owner/repo): ").strip() or "bzdmr0/GitHub-PR-Tool"
             file_path = input("Enter file path: ").strip()
@@ -330,12 +379,16 @@ if __name__ == "__main__":
         elif choice == "4":
             create_commit_via_api_auto()
         elif choice == "5":
-            bulk_commit_changes()
+            push_choice = input("Auto-push to GitHub? (y/n, default: y): ").strip().lower()
+            auto_push = push_choice != 'n'
+            bulk_commit_changes(auto_push)
         elif choice == "6":
             file_paths = input("Enter file path(s) separated by comma: ").strip().split(',')
             file_paths = [fp.strip() for fp in file_paths if fp.strip()]
             commit_message = input("Enter commit message: ").strip()
-            create_commit_with_gitpython(file_paths, commit_message)
+            push_choice = input("Auto-push to GitHub? (y/n, default: y): ").strip().lower()
+            auto_push = push_choice != 'n'
+            create_commit_with_gitpython(file_paths, commit_message, auto_push)
         elif choice == "7":
             limit = input("Number of commits to show (default: 5): ").strip()
             limit = int(limit) if limit.isdigit() else 5
@@ -344,7 +397,9 @@ if __name__ == "__main__":
             file_path = input("Enter new file path: ").strip()
             content = input("Enter file content: ").strip()
             commit_message = input("Enter commit message: ").strip()
-            create_file_and_commit(file_path, content, commit_message)
+            push_choice = input("Auto-push to GitHub? (y/n, default: y): ").strip().lower()
+            auto_push = push_choice != 'n'
+            create_file_and_commit(file_path, content, commit_message, auto_push)
         elif choice == "9":
             print("Goodbye!")
             break
