@@ -1,13 +1,7 @@
 from github import Github
 import os
 import subprocess
-import base64
 from datetime import datetime
-try:
-    import git
-    GITPYTHON_AVAILABLE = True
-except ImportError:
-    GITPYTHON_AVAILABLE = False
 
 #asdasdaasdasd1111222233333
 
