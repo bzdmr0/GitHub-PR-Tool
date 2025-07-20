@@ -1,0 +1,8 @@
+/home/bzdmr/fresh-github-project/build/CMakeFiles/test_app.dir
+/home/bzdmr/fresh-github-project/build/CMakeFiles/run.dir
+/home/bzdmr/fresh-github-project/build/CMakeFiles/edit_cache.dir
+/home/bzdmr/fresh-github-project/build/CMakeFiles/rebuild_cache.dir
+/home/bzdmr/fresh-github-project/build/CMakeFiles/list_install_components.dir
+/home/bzdmr/fresh-github-project/build/CMakeFiles/install.dir
+/home/bzdmr/fresh-github-project/build/CMakeFiles/install/local.dir
+/home/bzdmr/fresh-github-project/build/CMakeFiles/install/strip.dir
