@@ -2,17 +2,19 @@
 // Ekranın sol yarısı: DITHER kapalı, sağ yarısı: DITHER açık
 // Ekranın üst kısmı: SAMPLE_ALPHA_TO_COVERAGE kapalı, alt kısmı açık
 
-#include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include "screen.h"
+
+// Simple OpenGL ES 2.0 headers instead of GLAD
+#include <GLES2/gl2.h>
 
 void init(GLFWwindow **window);
 GLint create_shader(const char *shaderSource, GLenum type);
 GLint create_program(unsigned int vertexShader, unsigned int fragmentShader);
 void framebuffer_size_callback(GLFWwindow *window, int width, int height);
 void draw(GLint programID, unsigned int VBO, int size, float color[3]);
+void processInput(GLFWwindow *window);
 
 int g_width = 1280, g_height = 720;
 
@@ -93,8 +95,6 @@ int main() {
         glViewport(0, 0, g_width, g_height);
         draw(programID, rectangleVBO, 6, yellow);
 
-        processInput(window);
-
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
@@ -125,10 +125,8 @@ void init(GLFWwindow **window) {
     glfwMakeContextCurrent(*window);
     glfwSetFramebufferSizeCallback(*window, framebuffer_size_callback);
 
-    if (!gladLoadGLES2Loader((GLADloadproc)glfwGetProcAddress)) {
-        printf("Failed to initialize GLAD\n");
-        exit(-1);
-    }
+    // OpenGL ES 2.0 doesn't need GLAD initialization
+    // The context is ready to use after glfwMakeContextCurrent
 }
 
 GLint create_shader(const char *shaderSource, GLenum type) {
@@ -179,4 +177,9 @@ void draw(GLint programID, unsigned int VBO, int size, float color[3]) {
     glEnableVertexAttribArray(0);
     glUniform3fv(glGetUniformLocation(programID, "uColor"), 1, color);
     glDrawArrays(GL_TRIANGLES, 0, size);
+}
+
+void processInput(GLFWwindow *window) {
+    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+        glfwSetWindowShouldClose(window, 1);
 }
