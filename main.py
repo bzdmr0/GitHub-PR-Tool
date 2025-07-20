@@ -122,3 +122,5 @@ if __name__ == "__main__":
     bulk_commit_changes(auto_push)
 
     create_pull_request()
+
+# Note: The above code assumes you have the `PyGithub` library installed.
